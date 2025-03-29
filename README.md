@@ -4,12 +4,8 @@
 ## Contacts
 st067173@student.spbu.ru
 ## Description
-Program must open a BMP file, read them and upload to memory with showing  
-how much memory was used. After saving in memory program must to turn an image  
-to 90° by clockwise and counter clockwise.
-Also program must to use a Gaussian blur to BMP file.
-All results must be saved like separated file.
+I did the A+ level and was able to turn the image into grayscale and 90 degrees and i added a gaussian filter.
 ## Build
 make
 ## Run
-./main
+./mylab
