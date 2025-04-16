@@ -1,55 +1,32 @@
-PROJECT = lab
-
-LIBPROJECT = $(PROJECT).a
-
-TESTPROJECT = test-$(PROJECT)
-
+# Compiler
 CXX = g++
 
-A = ar
+# Compiler flags
+CXXFLAGS = -std=c++17 -Wall -Wextra -O2
 
-AFLAGS = rsv
+# Target executable name
+TARGET = image_processing
 
-CCXFLAGS = -I. -std=c++17 -Wall -g -fPIC
+# Source files
+SRCS = main.cpp
 
-LDXXFLAGS = $(CCXFLAGS) -L. -l:$(LIBPROJECT)
+# Object files (automatically derived from source files)
+OBJS = $(SRCS:.cpp=.o)
 
-LDGTESTFLAGS = $(LDXXFLAGS) -lgtest -lgtest_main -lpthread
+# Default target
+all: $(TARGET)
 
-DEPS=$(wildcard *.h)
+# Link the object files into the final executable
+$(TARGET): $(OBJS)
+    $(CXX) $(CXXFLAGS) -o $(TARGET) $(OBJS)
 
-OBJ=main.o
+# Compile .cpp files into .o files
+%.o: %.cpp
+    $(CXX) $(CXXFLAGS) -c $< -o $@
 
-TEST-OBJ=test_transformers.o 
-
-
-.PHONY: default
-
-default: all;
-
-%.o: %.cpp $(DEPS)
-	$(CXX) -c -o $@ $< $(CXXFLAGS)
-
-$(LIBPROJECT): $(OBJ)
-	$(A) $(AFLAGS) $@ $^
-
-$(PROJECT): main.o $(LIBPROJECT)
-	$(CXX) -o $@ main.o $(LDXXFLAGS)
-
-
-$(TESTPROJECT): $(LIBPROJECT) $(TEST-OBJ)
-	$(CXX) -o $@ $(TEST-OBJ) $(LDGTESTFLAGS)
-
-test: $(TESTPROJECT)
-
-all: $(PROJECT)
-
-.PHONY: clean
-
+# Clean up build files
 clean:
-	rm -f *.o , output_clockwise.bmp , output_counterclockwise.bmp , output_filtered.bmp 
+    rm -f $(OBJS) $(TARGET)
 
-cleanall: clean
-	rm -f $(PROJECT)
-	rm -f $(LIBPROJECT)
-	rm -f $(TESTPROJECT)
+# Phony targets
+.PHONY: all clean

@@ -19,8 +19,13 @@ unsigned char* load_bmp(const char* file_path, int& width, int& height) {
         return nullptr;
     }
 
+    if (dibHeader.biBitCount != 24) { // Ensure 24-bit RGB format
+        std::cerr << "Unsupported BMP format. Only 24-bit RGB is supported." << std::endl;
+        return nullptr;
+    }
+
     width = dibHeader.biWidth;
-    height = std::abs(dibHeader.biHeight);  
+    height = std::abs(dibHeader.biHeight); // Handle bottom-up or top-down BMPs
 
     // Move file pointer to pixel data
     file.seekg(bmpHeader.bfOffBits, std::ios::beg);
@@ -29,7 +34,10 @@ unsigned char* load_bmp(const char* file_path, int& width, int& height) {
     int row_padded = (width * 3 + 3) & (~3); 
     std::vector<unsigned char> image_data(row_padded * height);
 
-    file.read(reinterpret_cast<char*>(image_data.data()), image_data.size());
+    if (!file.read(reinterpret_cast<char*>(image_data.data()), image_data.size())) {
+        std::cerr << "Error reading pixel data from BMP file." << std::endl;
+        return nullptr;
+    }
 
     unsigned char* grayscale_image = new unsigned char[width * height];
 
@@ -50,13 +58,16 @@ unsigned char* load_bmp(const char* file_path, int& width, int& height) {
 
 // Function to save BMP image
 void save_bmp(const char* file_path, unsigned char* image_data, int width, int height) {
-    uint32_t biSizeImage = (width + 3) & (~3); 
-    biSizeImage *= height;  // Total image size
+    int row_padded = (width + 3) & (~3); // Row padding for 8-bit BMP
+    uint32_t biSizeImage = row_padded * height; 
 
-    BITMAPINFOHEADER dibHeader = { 40, width, height, 1, 8, 0, biSizeImage, 0, 0, 256, 0 };
+    BITMAPINFOHEADER dibHeader = { 
+        40, width, height, 1, 8, 0, biSizeImage, 0, 0, 256, 0 
+    };
 
-    BITMAPFILEHEADER bmpHeader = { 0x4D42, 0, 0, 0, 54 + 256 * 4 };
-    bmpHeader.bfSize = bmpHeader.bfOffBits + dibHeader.biSizeImage;
+    BITMAPFILEHEADER bmpHeader = { 
+        0x4D42, 54 + 256 * 4 + biSizeImage, 0, 0, 54 + 256 * 4 
+    };
 
     std::ofstream file(file_path, std::ios::binary);
     if (!file) {
@@ -73,8 +84,7 @@ void save_bmp(const char* file_path, unsigned char* image_data, int width, int h
     }
 
     // Row padding
-    int row_padded = (width + 3) & (~3);
-    std::vector<unsigned char> padded_row(row_padded);
+    std::vector<unsigned char> padded_row(row_padded, 0); // Initialize with zeros
 
     // Write pixel data (indexing into the grayscale palette)
     for (int y = height - 1; y >= 0; --y) {
@@ -85,13 +95,11 @@ void save_bmp(const char* file_path, unsigned char* image_data, int width, int h
     }
 }
 
-
 // Function to calculate memory usage
 size_t calculate_memory_usage(int width, int height) {
     // Memory allocated = width * height * size of one pixel (1 byte for grayscale images)
     return static_cast<size_t>(width * height);
 }
-
 
 // Rotate image 90 degrees clockwise
 unsigned char* rotate_clockwise(unsigned char* image_data, int width, int height) {
@@ -118,8 +126,6 @@ unsigned char* rotate_counterclockwise(unsigned char* image_data, int width, int
 
     return rotated_image;
 }
-
-
 
 // Apply a Gaussian filter with a larger kernel and better edge handling
 unsigned char* apply_gaussian_filter(unsigned char* image_data, int width, int height) {
@@ -154,7 +160,6 @@ unsigned char* apply_gaussian_filter(unsigned char* image_data, int width, int h
         }
     }
 
-
     // Handle edges by copying original pixel values
     for (int y = 0; y < height; ++y) {
         for (int x = 0; x < width; ++x) {
@@ -166,8 +171,6 @@ unsigned char* apply_gaussian_filter(unsigned char* image_data, int width, int h
 
     return filtered_image;
 }
-
-
 
 int main() {
     int width, height;
@@ -182,13 +185,11 @@ int main() {
         return -1;
     }
 
-
-// Calculate memory usage
+    // Calculate memory usage
     size_t memory_allocated = calculate_memory_usage(width, height);
     std::cout << "Memory allocated for loading the image: " 
               << memory_allocated << " bytes (" 
               << (memory_allocated / 1024.0) << " KB)" << std::endl;
-
 
     // Rotate and save images
     unsigned char* rotated_clockwise = rotate_clockwise(image_data, width, height);
@@ -197,16 +198,17 @@ int main() {
     unsigned char* rotated_counterclockwise = rotate_counterclockwise(image_data, width, height);
     save_bmp(output_file_counterclockwise, rotated_counterclockwise, height, width);
 
-
     // Apply Gaussian filter to the rotated clockwise image
     unsigned char* filtered_image = apply_gaussian_filter(rotated_clockwise, height, width);
     save_bmp(output_file_filtered, filtered_image, height, width);
 
-
-     // Print some pixel values for debugging
-    std::cout << "Debugging pixel values (before and after Gaussian filter):" << std::endl;
-    std::cout << "Original: " << static_cast<int>(rotated_clockwise[100 * height + 100])
-              << ", Filtered: " << static_cast<int>(filtered_image[100 * height + 100]) << std::endl;
+    // Print some pixel values for debugging
+    int debug_x = 100, debug_y = 100;
+    if (debug_x < width && debug_y < height) {
+        std::cout << "Debugging pixel values (before and after Gaussian filter):" << std::endl;
+        std::cout << "Original: " << static_cast<int>(rotated_clockwise[debug_y * height + debug_x])
+                  << ", Filtered: " << static_cast<int>(filtered_image[debug_y * height + debug_x]) << std::endl;
+    }
 
     // Free dynamically allocated memory
     delete[] image_data;

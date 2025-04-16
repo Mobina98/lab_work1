@@ -1,3 +1,4 @@
+/*Mobina Ahmadimasoud, st067173@student.spbu.ru, 24.B83-mm*/
 
 #ifndef MAIN_h
 #define MAIN_h
@@ -8,8 +9,6 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
-
-#endif
 
 #pragma pack(push, 1)
 
@@ -38,3 +37,5 @@ struct BITMAPINFOHEADER {
 };
 
 #pragma pack(pop)
+
+#endif
