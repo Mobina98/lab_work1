@@ -10,6 +10,8 @@
 #include <cmath>
 #include <cstdint>
 
+#endif
+
 #pragma pack(push, 1)
 
 // File header for BMP format
@@ -37,5 +39,3 @@ struct BITMAPINFOHEADER {
 };
 
 #pragma pack(pop)
-
-#endif
