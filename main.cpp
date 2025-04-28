@@ -1,5 +1,3 @@
-/*Mobina Ahmadimasoud, st067173@student.spbu.ru, 24.B83-mm*/
-
 #include "main.h"
 
 // Function to load BMP image and convert to grayscale

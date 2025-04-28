@@ -1,5 +1,3 @@
-/*Mobina Ahmadimasoud, st067173@student.spbu.ru, 24.B83-mm*/
-
 #ifndef MAIN_h
 #define MAIN_h
 
