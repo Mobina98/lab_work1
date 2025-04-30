@@ -1,4 +1,4 @@
-# Authot
+# Author
 Mobina Ahmadimasoud, group 24.B83-mm
 # Contacts
 st067173@student.spbu.ru
