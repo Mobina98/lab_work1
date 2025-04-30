@@ -1,7 +1,8 @@
 CC=g++
 CFLAGS=-c -Wall
-LDFLAGS=
-SOURCES=main.cpp
+LDFLAGS=-std=c++20
+SOURCES=main.cpp methods.cpp
+HEADERS= bmp.h
 OBJECTS=$(SOURCES:.cpp=.o)
 EXECUTABLE=main
 
