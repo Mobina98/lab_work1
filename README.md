@@ -1,13 +1,11 @@
-#Lab.1
-
-Mobina Ahmadimasoud. group 24.B83-mm
-
+# Authot
+Mobina Ahmadimasoud, group 24.B83-mm
+# Contacts
 st067173@student.spbu.ru
-
-Lab.1 - I did the A+ level and was able to turn the image into grayscale and 90 degrees and i added a gaussian filter.       
-
-BUILD: make
-
-RUN: ./mylab
-
-To clean: make cleanall
+# Description
+Program must open a BMP file, read it and upload to memory with showing how much memory was used. After that program must to turn an image 90° by 
+right-handed and counter right handed. Program must to use a Gaussian blur to BMP file. All results must be saved like seperated file.
+# Build
+make
+# Run
+./main

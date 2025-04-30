@@ -1,220 +1,260 @@
-#include "main.h"
+#include <iostream>
+#include <fstream>
+#include <cstdint>
 
-// Function to load BMP image and convert to grayscale
-unsigned char* load_bmp(const char* file_path, int& width, int& height) {
-    std::ifstream file(file_path, std::ios::binary);
+#pragma pack(push, 1)
+struct BMPHeader {
+    uint16_t fileType{0x4D42};
+    uint32_t fileSize{0};
+    uint16_t reserved1{0};
+    uint16_t reserved2{0};
+    uint32_t offsetData{0};
+};
+
+struct BMPInfoHeader {
+    uint32_t size{0};
+    int32_t width{0};
+    int32_t height{0};
+    uint16_t planes{1};
+    uint16_t bitCount{0};
+    uint32_t compression{0};
+    uint32_t sizeImage{0};
+    int32_t xPixelsPerMeter{0};
+    int32_t yPixelsPerMeter{0};
+    uint32_t colorsUsed{0};
+    uint32_t colorsImportant{0};
+};
+#pragma pack(pop)
+
+struct Pixel {
+    uint8_t blue;
+    uint8_t green;
+    uint8_t red;
+};
+
+class PictureBMP {
+public:
+    PictureBMP(const std::string &filename);
+    ~PictureBMP();
+    void Save(const std::string &filename);
+    void Rotate90();
+    void RotateCounter90();
+    void GaussianFilter();
+
+private:
+    BMPHeader header;
+    BMPInfoHeader infoHeader;
+    Pixel** data;
+    bool Memory(int height, int width);
+    void FreeMemory(int height);
+};
+
+bool PictureBMP::Memory(int height,int width) {
+    data = new (std::nothrow) Pixel*[height];
+    if (!data) return false;
+
+    for (int i = 0; i < height; ++i) {
+        data[i] = new (std::nothrow) Pixel[width];
+        if (!data[i]) {
+            for (int j = 0; j < i; ++j) {
+                delete[] data[j];
+            }
+            delete[] data;
+            data = nullptr;
+            return false;
+        }
+    }
+    return true;
+}
+
+void PictureBMP::FreeMemory(int height) {
+    if (data) {
+        for (int i = 0; i < height; ++i) {
+            delete[] data[i];
+        }
+        delete[] data;
+        data = nullptr;
+    }
+}
+
+
+PictureBMP::PictureBMP(const std::string &filename) {
+    std::ifstream file(filename, std::ios::binary);
     if (!file) {
-        std::cerr << "Error opening file: " << file_path << std::endl;
-        return nullptr;
+        throw std::runtime_error("Error open file.");
     }
 
-    BITMAPFILEHEADER bmpHeader;
-    BITMAPINFOHEADER dibHeader;
-
-    file.read(reinterpret_cast<char*>(&bmpHeader), sizeof(bmpHeader));
-    file.read(reinterpret_cast<char*>(&dibHeader), sizeof(dibHeader));
-
-    if (bmpHeader.bfType != 0x4D42) {
-        std::cerr << "Not a valid BMP file." << std::endl;
-        return nullptr;
+    file.read(reinterpret_cast<char *>(&header), sizeof(header));
+    if (header.fileType != 0x4D42) {
+        throw std::runtime_error("File format is not BMP.");
     }
 
-    width = dibHeader.biWidth;
-    height = std::abs(dibHeader.biHeight);  
+    file.read(reinterpret_cast<char *>(&infoHeader), sizeof(infoHeader));
 
-    // Move file pointer to pixel data
-    file.seekg(bmpHeader.bfOffBits, std::ios::beg);
+    infoHeader.height = std::abs(infoHeader.height);
+    infoHeader.width = std::abs(infoHeader.width);
 
-    // Calculate the row size including padding
-    int row_padded = (width * 3 + 3) & (~3); 
-    std::vector<unsigned char> image_data(row_padded * height);
+    if (infoHeader.width == 0 || infoHeader.height == 0) {
+        throw std::runtime_error("unexceptable file size.");
+    }
+    file.seekg(header.offsetData, file.beg);
 
-    file.read(reinterpret_cast<char*>(image_data.data()), image_data.size());
 
-    unsigned char* grayscale_image = new unsigned char[width * height];
+    Memory(infoHeader.height, infoHeader.width);
 
-    // Convert to grayscale (assuming BMP is in 24-bit color)
-    for (int y = 0; y < height; ++y) {
-        for (int x = 0; x < width; ++x) {
-            int pixel_index = y * row_padded + x * 3;
-            unsigned char r = image_data[pixel_index + 2];
-            unsigned char g = image_data[pixel_index + 1];
-            unsigned char b = image_data[pixel_index];
-            unsigned char gray = static_cast<unsigned char>(0.3 * r + 0.59 * g + 0.11 * b);
-            grayscale_image[y * width + x] = gray;
+
+    for (int i = 0; i < infoHeader.height; ++i) {
+        for (int j = 0; j < infoHeader.width; ++j) {
+            file.read(reinterpret_cast<char *>(&data[i][j]), sizeof(Pixel));
+            if (!file) {
+                throw std::runtime_error("Error file read.");
+            }
         }
     }
 
-    return grayscale_image;
+    file.close();
 }
 
-// Function to save BMP image
-void save_bmp(const char* file_path, unsigned char* image_data, int width, int height) {
-    uint32_t biSizeImage = (width + 3) & (~3); 
-    biSizeImage *= height;  // Total image size
 
-    BITMAPINFOHEADER dibHeader = { 40, width, height, 1, 8, 0, biSizeImage, 0, 0, 256, 0 };
+PictureBMP::~PictureBMP() {
+    FreeMemory(infoHeader.height);
+}
 
-    BITMAPFILEHEADER bmpHeader = { 0x4D42, 0, 0, 0, 54 + 256 * 4 };
-    bmpHeader.bfSize = bmpHeader.bfOffBits + dibHeader.biSizeImage;
 
-    std::ofstream file(file_path, std::ios::binary);
+void PictureBMP::Save(const std::string &filename) {
+    std::ofstream file(filename, std::ios::binary);
     if (!file) {
-        std::cerr << "Error saving image: " << file_path << std::endl;
-        return;
+        throw std::runtime_error("File save error.");
     }
 
-    file.write(reinterpret_cast<const char*>(&bmpHeader), sizeof(bmpHeader));
-    file.write(reinterpret_cast<const char*>(&dibHeader), sizeof(dibHeader));
+    int byte = infoHeader.height * infoHeader.width * 4;
 
-    // Write grayscale color palette (0-255, one color per index)
-    for (int i = 0; i < 256; ++i) {
-        file.put(i); file.put(i); file.put(i); file.put(0);
-    }
+    std::cout << "File " << filename << " use " << byte << " bytes." << std::endl;
 
-    // Row padding
-    int row_padded = (width + 3) & (~3);
-    std::vector<unsigned char> padded_row(row_padded);
+    file.write(reinterpret_cast<const char *>(&header), sizeof(header));
+    file.write(reinterpret_cast<const char *>(&infoHeader), sizeof(infoHeader));
 
-    // Write pixel data (indexing into the grayscale palette)
-    for (int y = height - 1; y >= 0; --y) {
-        for (int x = 0; x < width; ++x) {
-            padded_row[x] = image_data[y * width + x];
+    for (int i = 0; i < infoHeader.height; ++i) {
+        for (int j = 0; j < infoHeader.width; ++j) {
+            file.write(reinterpret_cast<const char *>(&data[i][j]), sizeof(Pixel));
         }
-        file.write(reinterpret_cast<const char*>(padded_row.data()), row_padded);
     }
+    file.close();
 }
 
 
-// Function to calculate memory usage
-size_t calculate_memory_usage(int width, int height) {
-    // Memory allocated = width * height * size of one pixel (1 byte for grayscale images)
-    return static_cast<size_t>(width * height);
-}
 
 
-// Rotate image 90 degrees clockwise
-unsigned char* rotate_clockwise(unsigned char* image_data, int width, int height) {
-    unsigned char* rotated_image = new unsigned char[width * height];
+void PictureBMP::Rotate90() {
+    Pixel** rotatedData = new Pixel*[infoHeader.width];
+    for (int i = 0; i < infoHeader.width; ++i) {
+        rotatedData[i] = new Pixel[infoHeader.height];
+    }
 
-    for (int y = 0; y < height; ++y) {
-        for (int x = 0; x < width; ++x) {
-            rotated_image[x * height + (height - y - 1)] = image_data[y * width + x];
+    for (int i = 0; i < infoHeader.height; ++i) {
+        for (int j = 0; j < infoHeader.width; ++j) {
+            rotatedData[j][infoHeader.height - i - 1] = data[i][j];
         }
     }
 
-    return rotated_image;
+    FreeMemory(infoHeader.height);
+
+    data = rotatedData;
+    std::swap(infoHeader.width, infoHeader.height);
 }
 
-// Rotate image 90 degrees counterclockwise
-unsigned char* rotate_counterclockwise(unsigned char* image_data, int width, int height) {
-    unsigned char* rotated_image = new unsigned char[width * height];
 
-    for (int y = 0; y < height; ++y) {
-        for (int x = 0; x < width; ++x) {
-            rotated_image[(width - x - 1) * height + y] = image_data[y * width + x];
+void PictureBMP::RotateCounter90() {
+    Pixel** rotatedData = new Pixel*[infoHeader.width];
+    for (int i = 0; i < infoHeader.width; ++i) {
+        rotatedData[i] = new Pixel[infoHeader.height];
+    }
+
+    for (int i = 0; i < infoHeader.height; ++i) {
+        for (int j = 0; j < infoHeader.width; ++j) {
+            rotatedData[infoHeader.width - j - 1][i] = data[i][j];
         }
     }
 
-    return rotated_image;
+    FreeMemory(infoHeader.height);
+
+    data = rotatedData;
+    std::swap(infoHeader.width, infoHeader.height);
 }
 
-
-
-// Apply a Gaussian filter with a larger kernel and better edge handling
-unsigned char* apply_gaussian_filter(unsigned char* image_data, int width, int height) {
-    unsigned char* filtered_image = new unsigned char[width * height];
-
-    // Define a larger 5x5 Gaussian kernel (normalized)
-    float kernel[5][5] = {
-        {1 / 273.0f,  4 / 273.0f,  7 / 273.0f,  4 / 273.0f, 1 / 273.0f},
-        {4 / 273.0f, 16 / 273.0f, 26 / 273.0f, 16 / 273.0f, 4 / 273.0f},
-        {7 / 273.0f, 26 / 273.0f, 41 / 273.0f, 26 / 273.0f, 7 / 273.0f},
-        {4 / 273.0f, 16 / 273.0f, 26 / 273.0f, 16 / 273.0f, 4 / 273.0f},
-        {1 / 273.0f,  4 / 273.0f,  7 / 273.0f,  4 / 273.0f, 1 / 273.0f}
+void PictureBMP::GaussianFilter() {
+    float kernel[3][3] = {
+        {1 / 16.0f, 2 / 16.0f, 1 / 16.0f},
+        {2 / 16.0f, 4 / 16.0f, 2 / 16.0f},
+        {1 / 16.0f, 2 / 16.0f, 1 / 16.0f}
     };
 
-    // Apply the kernel to each pixel (skip edges for simplicity)
-    for (int y = 2; y < height - 2; ++y) {
-        for (int x = 2; x < width - 2; ++x) {
-            float sum = 0.0f;
+    Pixel** tempData = new Pixel*[infoHeader.height];
+    for (int i = 0; i < infoHeader.height; ++i) {
+        tempData[i] = new Pixel[infoHeader.width];
+    }
 
-            // Convolve the 5x5 region
-            for (int ky = -2; ky <= 2; ++ky) {
-                for (int kx = -2; kx <= 2; ++kx) {
-                    int pixel_x = x + kx;
-                    int pixel_y = y + ky;
-                    unsigned char pixel_value = image_data[pixel_y * width + pixel_x];
-                    sum += pixel_value * kernel[ky + 2][kx + 2];
+    for (int y = 0; y < infoHeader.height; ++y) {
+        for (int x = 0; x < infoHeader.width; ++x) {
+            float sumRed = 0, sumGreen = 0, sumBlue = 0;
+
+
+            for (int ky = -1; ky <= 1; ++ky) {
+                for (int kx = -1; kx <= 1; ++kx) {
+                    int nx = x + kx;
+                    int ny = y + ky;
+
+                    if (nx < 0) nx = 0;
+                    if (nx >= infoHeader.width) nx = infoHeader.width - 1;
+                    if (ny < 0) ny = 0;
+                    if (ny >= infoHeader.height) ny = infoHeader.height - 1;
+
+
+                    sumRed   += data[ny][nx].red * kernel[ky + 1][kx + 1];
+                    sumGreen += data[ny][nx].green * kernel[ky + 1][kx + 1];
+                    sumBlue  += data[ny][nx].blue * kernel[ky + 1][kx + 1];
                 }
             }
 
-            // Set the filtered value
-            filtered_image[y * width + x] = static_cast<unsigned char>(sum);
+
+            tempData[y][x].red = static_cast<uint8_t>((sumRed < 0) ? 0 : ((sumRed > 255) ? 255 : sumRed));
+            tempData[y][x].green = static_cast<uint8_t>((sumGreen < 0) ? 0 : ((sumGreen > 255) ? 255 : sumGreen));
+            tempData[y][x].blue = static_cast<uint8_t>((sumBlue < 0) ? 0 : ((sumBlue > 255) ? 255 : sumBlue));
         }
     }
 
 
-    // Handle edges by copying original pixel values
-    for (int y = 0; y < height; ++y) {
-        for (int x = 0; x < width; ++x) {
-            if (y < 2 || x < 2 || y >= height - 2 || x >= width - 2) {
-                filtered_image[y * width + x] = image_data[y * width + x];
-            }
+    for (int y = 0; y < infoHeader.height; ++y) {
+        for (int x = 0; x < infoHeader.width; ++x) {
+            data[y][x] = tempData[y][x];
         }
     }
 
-    return filtered_image;
+    for (int i = 0; i < infoHeader.height; ++i) {
+        delete[] tempData[i];
+    }
+    delete[] tempData;
 }
 
 
 
 int main() {
-    int width, height;
-    const char* input_file = "input_image.bmp";
-    const char* output_file_clockwise = "output_clockwise.bmp";
-    const char* output_file_counterclockwise = "output_counterclockwise.bmp";
-    const char* output_file_filtered = "output_filtered.bmp";
+    try {
+        PictureBMP image("input.bmp");
+        PictureBMP imageCounterClockwise("input.bmp");
 
-    // Load image data
-    unsigned char* image_data = load_bmp(input_file, width, height);
-    if (!image_data) {
-        return -1;
+        image.Rotate90();
+        image.Save("output_right-handed.bmp");
+
+        imageCounterClockwise.RotateCounter90();
+        imageCounterClockwise.Save("output_counterright-handed.bmp");
+
+
+        image.GaussianFilter();
+        image.Save("blur.bmp");
+
+    } catch (const std::exception &e) {
+        std::cerr << "Error: " << e.what() << std::endl;
     }
-
-
-// Calculate memory usage
-    size_t memory_allocated = calculate_memory_usage(width, height);
-    std::cout << "Memory allocated for loading the image: " 
-              << memory_allocated << " bytes (" 
-              << (memory_allocated / 1024.0) << " KB)" << std::endl;
-
-
-    // Rotate and save images
-    unsigned char* rotated_clockwise = rotate_clockwise(image_data, width, height);
-    save_bmp(output_file_clockwise, rotated_clockwise, height, width);
-
-    unsigned char* rotated_counterclockwise = rotate_counterclockwise(image_data, width, height);
-    save_bmp(output_file_counterclockwise, rotated_counterclockwise, height, width);
-
-
-    // Apply Gaussian filter to the rotated clockwise image
-    unsigned char* filtered_image = apply_gaussian_filter(rotated_clockwise, height, width);
-    save_bmp(output_file_filtered, filtered_image, height, width);
-
-
-     // Print some pixel values for debugging
-    std::cout << "Debugging pixel values (before and after Gaussian filter):" << std::endl;
-    std::cout << "Original: " << static_cast<int>(rotated_clockwise[100 * height + 100])
-              << ", Filtered: " << static_cast<int>(filtered_image[100 * height + 100]) << std::endl;
-
-    // Free dynamically allocated memory
-    delete[] image_data;
-    delete[] rotated_clockwise;
-    delete[] rotated_counterclockwise;
-    delete[] filtered_image;
-
-    std::cout << "Processing complete." << std::endl;
-
     return 0;
 }
