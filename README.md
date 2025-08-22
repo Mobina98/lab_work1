@@ -4,11 +4,11 @@
 ## Contacts
 st067173@student.spbu.ru
 ## Description
-Program must open a BMP file, read them and upload to memory with showing  
-how much memory was used. After saving in memory program must to turn an image  
-to 90° by clockwise and counter clockwise.
-Also program must to use a Gaussian blur to BMP file.
-All results must be saved like separated file.
+The program opens a BMP file, reads and uploads memory by showing  
+amount of memory used. After saving in memory, program turns an image  
+by 90° clockwise and counter clockwise.
+Program uses a Gaussian blur to BMP file.
+Outputs should be saved as separated files.
 ## Build
 make
 ## Run
